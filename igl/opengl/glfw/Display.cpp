@@ -122,6 +122,12 @@ bool Display::launch_rendering(bool loop)
 	{
 
 		double tic = igl::get_seconds();
+
+		if (renderer->GetScene()->IKon){
+			renderer->GetScene()->animateIK();
+		}
+		renderer->checkCollision();
+
 		renderer->draw(window);
 		glfwSwapBuffers(window);
 		if (renderer->core().is_animating || frame_counter++ < num_extra_frames)
@@ -137,7 +143,7 @@ bool Display::launch_rendering(bool loop)
 		}
 		else
 		{
-			glfwWaitEvents();
+			glfwPollEvents();
 			frame_counter = 0;
 		}
 		if (!loop)

@@ -13,6 +13,7 @@
 #include <cassert>
 #include <cstdint>
 #include "Movable.h"
+#include "igl/AABB.h"
 //#include <Eigen/Core>
 #include <memory>
 #include <vector>
@@ -143,6 +144,9 @@ public:
 
   // Generates a default grid texture
   IGL_INLINE void grid_texture();
+
+  void drawBox(Eigen::AlignedBox<double, 3> box, int color);
+  igl::AABB<Eigen::MatrixXd, 3> tree;
 
   // Copy visualization options from one viewport to another
   //IGL_INLINE void copy_options(const ViewerCore &from, const ViewerCore &to);

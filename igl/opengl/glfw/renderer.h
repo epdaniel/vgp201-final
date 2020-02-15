@@ -4,6 +4,7 @@
 #include <functional>
 #include <igl/opengl/ViewerCore.h>
 #include <igl/opengl/glfw/Viewer.h>
+#include "igl/opengl/glfw/Display.h"
 
 struct GLFWwindow;
 
@@ -97,6 +98,11 @@ public:
 			(selected_core_index + core_list.size() + (unicode_key == ']' ? 1 : -1)) % core_list.size();
 
 	}
+	
+	void changeDirection(int dir);
+	void checkCollision();
+	bool checkCollisionRec(igl::AABB<Eigen::MatrixXd, 3> *node1, igl::AABB<Eigen::MatrixXd, 3> *node2, Eigen::Matrix3d &A, Eigen::Matrix3d &B, Eigen::Matrix3d &C, int i1, int i2);
+	bool checkCollisionHelper(Eigen::AlignedBox<double, 3> &box1, Eigen::AlignedBox<double, 3> &box2, Eigen::Matrix3d &A, Eigen::Matrix3d &B, Eigen::Matrix3d &C, int i1, int i2);
 
 private:
 	// Stores all the viewing options
@@ -107,4 +113,3 @@ private:
 	float highdpi;
 	double xold, yold, xrel, yrel;
 };
-

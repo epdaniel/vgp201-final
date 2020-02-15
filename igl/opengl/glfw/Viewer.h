@@ -51,6 +51,7 @@ namespace glfw
     Viewer();
     ~Viewer();
     // Mesh IO
+	bool load_configuration();
     IGL_INLINE bool load_mesh_from_file(const std::string & mesh_file_name);
     IGL_INLINE bool save_mesh_to_file(const std::string & mesh_file_name);
    
@@ -69,6 +70,12 @@ namespace glfw
     IGL_INLINE void open_dialog_save_mesh();
 
 	IGL_INLINE void draw() {}
+
+	Eigen::Matrix4f ParentsTrans(int index);
+	Eigen::Matrix3f ParentsInverseRot(int index);
+	void animateIK();
+	void toggleIK();
+	void fixAxis();
     ////////////////////////
     // Multi-mesh methods //
     ////////////////////////
@@ -127,8 +134,11 @@ public:
 
     size_t selected_data_index;
     int next_data_id;
-
-
+	int snake_size = 0;
+	float snake_speed = 0.007;
+	int selected_ball = 10;
+	int balls[5] = { -1, -1, -1, -1, -1 };
+	bool IKon = false;
     
 
     // List of registered plugins

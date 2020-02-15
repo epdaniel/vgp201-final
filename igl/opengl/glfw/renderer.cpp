@@ -4,6 +4,8 @@
 #include <igl/unproject_onto_mesh.h>
 #include "igl/look_at.h"
 #include <Eigen/Dense>
+#include <iostream>
+using namespace std;
 Renderer::Renderer() : selected_core_index(0),
 next_core_id(2)
 {
@@ -66,7 +68,10 @@ IGL_INLINE void Renderer::draw( GLFWwindow* window)
 		{
 			if (mesh.is_visible & core.id)
 			{
-				core.draw(scn->MakeTrans(),mesh);
+				Matrix4f parents = Matrix4f().Identity();	
+				parents = scn->ParentsTrans(mesh.id);
+				Matrix4f temp = scn->MakeTrans() * parents;
+				core.draw(temp, mesh);
 			}
 		}
 	}
@@ -96,20 +101,210 @@ void Renderer::UpdatePosition(double xpos, double ypos)
 
 void Renderer::MouseProcessing(int button)
 {
-	
 	if (button == 1)
 	{
-
-		scn->data().MyTranslate(Eigen::Vector3f(-xrel / 2000.0f, 0, 0));
-		scn->data().MyTranslate(Eigen::Vector3f(0,yrel / 2000.0f,0));
-		
+		if (scn->selected_data_index == -1) {
+			scn->MyTranslate(Eigen::Vector3f(-xrel / 180.0f, 0, 0));
+			scn->MyTranslate(Eigen::Vector3f(0, yrel / 180.0f, 0));
+		}
+		else if (scn->selected_data_index >= 0 && (scn->selected_data_index < scn->snake_size)) {
+			scn->data(0).MyTranslate(Eigen::Vector3f(-xrel / 180.0f, 0, 0));
+			scn->data(0).MyTranslate(Eigen::Vector3f(0, yrel / 180.0f, 0));
+		}
+		else {
+			scn->data().MyTranslate(Eigen::Vector3f(-xrel / 180.0f, 0, 0));
+			scn->data().MyTranslate(Eigen::Vector3f(0, yrel / 180.0f, 0));
+		}
 	}
 	else
 	{
-		scn->data().MyRotate(Eigen::Vector3f(1,0,0),xrel / 180.0f);
-		scn->data().MyRotate(Eigen::Vector3f(0, 0,1),yrel / 180.0f);
+		if (scn->selected_data_index == -1) {
+			scn->MyRotate(Eigen::Vector3f(0, -1, 0), xrel / 180.0f, true);
+			scn->MyRotate(Eigen::Vector3f(-1, 0, 0), yrel / 180.0f, false);
+		}
+		else {
+			scn->data().MyRotate(Eigen::Vector3f(0, -1, 0), xrel / 180.0f, true);
+			scn->data().MyRotate(Eigen::Vector3f(-1, 0, 0), yrel / 180.0f, false);
+		}
 	}
-	
+}
+
+using namespace std;
+
+//Returns true if box 1 and box 2 collide
+bool Renderer::checkCollisionHelper(Eigen::AlignedBox<double, 3> &box1, Eigen::AlignedBox<double, 3> &box2, Eigen::Matrix3d &A, Eigen::Matrix3d &B, Eigen::Matrix3d &C, int i1, int i2) {
+	double R, R0, R1;
+
+	//cout << " Checking box collision for " << i1 << " " << i2 << endl;
+	double a0 = box1.sizes()[0] / 2;
+	double b0 = box2.sizes()[0] / 2;
+	double a1 = box1.sizes()[1] / 2;
+	double b1 = box2.sizes()[1] / 2;
+	double a2 = box1.sizes()[2] / 2;
+	double b2 = box2.sizes()[2] / 2;
+
+	Eigen::RowVector3d A0 = A * Eigen::Vector3d(1, 0, 0);
+	Eigen::RowVector3d A1 = A * Eigen::Vector3d(0, 1, 0);
+	Eigen::RowVector3d A2 = A * Eigen::Vector3d(0, 0, 1);
+
+	Eigen::RowVector3d B0 = B * Eigen::Vector3d(1, 0, 0);
+	Eigen::RowVector3d B1 = B * Eigen::Vector3d(0, 1, 0);
+	Eigen::RowVector3d B2 = B * Eigen::Vector3d(0, 0, 1);
+
+	Eigen::Vector4f temp = Eigen::Vector4f(box1.center()[0], box1.center()[1], box1.center()[2], 1);
+	temp = scn->ParentsTrans(i1) * scn->data_list[i1].MakeTrans() * temp;
+	Eigen::Vector3d C0 = Eigen::Vector3d(temp[0], temp[1], temp[2]);
+	temp = Eigen::Vector4f(box2.center()[0], box2.center()[1], box2.center()[2], 1);
+	temp = scn->ParentsTrans(i2) * scn->data_list[i2].MakeTrans() * temp;
+	Eigen::Vector3d C1 = Eigen::Vector3d(temp[0], temp[1], temp[2]);
+	Eigen::Vector3d D = C1 - C0;
+
+	// -------- Table Row 1 ---------
+	R0 = a0;
+	R1 = b0 * abs(C(0, 0)) + b1 * abs(C(0, 1)) + b2 * abs(C(0, 2));
+	R = abs(A0.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 2 ---------
+	R0 = a1;
+	R1 = b0 * abs(C(1, 0)) + b1 * abs(C(1, 1)) + b2 * abs(C(1, 2));
+	R = abs(A1.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 3 ---------
+	R0 = a2;
+	R1 = b0 * abs(C(2, 0)) + b1 * abs(C(2, 1)) + b2 * abs(C(2, 2));
+	R = abs(A2.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 4 ---------
+	R0 = a0 * abs(C(0, 0)) + a1 * abs(C(1, 0)) + a2 * abs(C(2, 0));
+	R1 = b0;
+	R = abs(B0.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 5 ---------
+	R0 = a0 * abs(C(0, 1)) + a1 * abs(C(1, 1)) + a2 * abs(C(2, 1));
+	R1 = b1;
+	R = abs(B1.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 6 ---------
+	R0 = a0 * abs(C(0, 2)) + a1 * abs(C(1, 2)) + a2 * abs(C(2, 2));
+	R1 = b2;
+	R = abs(B2.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 7 ---------
+	R0 = a1 * abs(C(2, 0)) + a2 * abs(C(1, 0));
+	R1 = b1 * abs(C(0, 2)) + b2 * abs(C(0, 1));
+	R = abs(C(1, 0) * A2.dot(D) - C(2, 0) * A1.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 8 ---------
+	R0 = a1 * abs(C(2, 1)) + a2 * abs(C(1, 1));
+	R1 = b0 * abs(C(0, 2)) + b2 * abs(C(0, 0));
+	R = abs(C(1, 1) * A2.dot(D) - C(2, 1) * A1.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 9 ---------
+	R0 = a1 * abs(C(2, 2)) + a2 * abs(C(1, 2));
+	R1 = b0 * abs(C(0, 1)) + b1 * abs(C(0, 0));
+	R = abs(C(1, 2) * A2.dot(D) - C(2, 2) * A1.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 10 ---------
+	R0 = a0 * abs(C(2, 0)) + a2 * abs(C(0, 0));
+	R1 = b1 * abs(C(1, 2)) + b2 * abs(C(1, 1));
+	R = abs(C(2, 0) * A0.dot(D) - C(0, 0) * A2.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 11 ---------
+	R0 = a0 * abs(C(2, 1)) + a2 * abs(C(0, 1));
+	R1 = b0 * abs(C(1, 2)) + b2 * abs(C(1, 0));
+	R = abs(C(2, 1) * A0.dot(D) - C(0, 1) * A2.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 12 ---------
+	R0 = a0 * abs(C(2, 2)) + a2 * abs(C(0, 2));
+	R1 = b0 * abs(C(1, 1)) + b1 * abs(C(1, 0));
+	R = abs(C(2, 2) * A0.dot(D) - C(0, 2) * A2.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 13 ---------
+	R0 = a0 * abs(C(1, 0)) + a1 * abs(C(0, 0));
+	R1 = b1 * abs(C(2, 2)) + b2 * abs(C(2, 1));
+	R = abs(C(0, 0) * A1.dot(D) - C(1, 0) * A0.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 14 ---------
+	R0 = a0 * abs(C(1, 1)) + a1 * abs(C(0, 1));
+	R1 = b0 * abs(C(2, 2)) + b2 * abs(C(2, 0));
+	R = abs(C(0, 1) * A1.dot(D) - C(1, 1) * A0.dot(D));
+	if (R > R0 + R1)
+		return false;
+	// -------- Table Row 15 ---------
+	R0 = a0 * abs(C(1, 2)) + a1 * abs(C(0, 2));
+	R1 = b0 * abs(C(2, 1)) + b1 * abs(C(2, 0));
+	R = abs(C(0, 2) * A1.dot(D) - C(1, 2) * A0.dot(D));
+	if (R > R0 + R1)
+		return false;
+	return true;
+}
+
+//Recursion call for checking collision, retruns true if node1 and node2 collide (checking untill leafs recursivly)
+//If they collide, populate leaf field in each data items
+bool Renderer::checkCollisionRec(igl::AABB<Eigen::MatrixXd, 3> *node1, igl::AABB<Eigen::MatrixXd, 3> *node2, Eigen::Matrix3d &A, Eigen::Matrix3d &B, Eigen::Matrix3d &C, int i1, int i2) {
+	if (checkCollisionHelper(node1->m_box, node2->m_box, A, B, C, i1, i2))
+	{
+		//No children, this is a leaf! populate field
+		if (node1->is_leaf() && node2->is_leaf())
+		{
+			/*scn->data_list[i1].clear();
+			scn->data_list[i2].clear();
+			scn->data_list[i1].drawBox(node1->m_box, 1);
+			scn->data_list[i2].drawBox(node2->m_box, 1);*/
+			return true;
+		}
+		else {
+			//Children pointers
+			igl::AABB<Eigen::MatrixXd, 3> *left1 = node1->is_leaf() ? node1 : node1->m_left;
+			igl::AABB<Eigen::MatrixXd, 3> *right1 = node1->is_leaf() ? node1 : node1->m_right;
+			igl::AABB<Eigen::MatrixXd, 3> *left2 = node2->is_leaf() ? node2 : node2->m_left;;
+			igl::AABB<Eigen::MatrixXd, 3> *right2 = node2->is_leaf() ? node2 : node2->m_right;
+
+			if (checkCollisionRec(left1, left2, A, B, C, i1, i2))
+				return true;
+			else if (checkCollisionRec(left1, right2, A, B, C, i1, i2))
+				return true;
+			else if (checkCollisionRec(right1, left2, A, B, C, i1, i2))
+				return true;
+			else if (checkCollisionRec(right1, right2, A, B, C, i1, i2))
+				return true;
+			else return false;
+		}
+	}
+	return false;
+}
+
+//Main collision checking function, inits leaf for each box to NULL
+//Call recursion func and let it do all the work
+//Leafs should be populated at the end, in case of collision
+void Renderer::checkCollision() {
+	int head_index = scn->snake_size - 1;
+	int ball_index = scn->selected_ball;
+	igl::AABB<Eigen::MatrixXd, 3> *node1 = &scn->data_list[head_index].tree;
+	igl::AABB<Eigen::MatrixXd, 3> *node2 = &scn->data_list[ball_index].tree;
+	Eigen::Matrix3d *A = &((Eigen::Matrix3d)scn->data_list[head_index].Tout.rotation().matrix().cast<double>());
+	Eigen::Matrix3d *B = &((Eigen::Matrix3d)scn->data_list[ball_index].Tout.rotation().matrix().cast<double>());
+	Eigen::Matrix3d *C = &((Eigen::Matrix3d)((*A).transpose() * (*B)));
+
+	if (checkCollisionRec(node1, node2, *A, *B, *C, head_index, ball_index)) {
+		//cout << "Collision detected! " << endl;
+		//scn->toggleIK();
+		scn->IKon = false;
+		scn->fixAxis();
+	}
 }
 
 Renderer::~Renderer()
@@ -128,7 +323,7 @@ bool Renderer::Picking(double newx, double newy)
 		Eigen::Matrix4f view = Eigen::Matrix4f::Identity();
 		igl::look_at(core().camera_eye, core().camera_center, core().camera_up, view);
 		view = view * (core().trackball_angle * Eigen::Scaling(core().camera_zoom * core().camera_base_zoom)
-				* Eigen::Translation3f(core().camera_translation + core().camera_base_translation)).matrix() * scn->MakeTrans() * scn->data().MakeTrans();
+			* Eigen::Translation3f(core().camera_translation + core().camera_base_translation)).matrix() * scn->MakeTrans() * scn->ParentsTrans(scn->selected_data_index) * scn->data().MakeTrans();
 		if (igl::unproject_onto_mesh(Eigen::Vector2f(x, y), view,
  			core().proj, core().viewport, scn->data().V, scn->data().F, fid, bc))
 		{

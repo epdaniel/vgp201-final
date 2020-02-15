@@ -47,6 +47,40 @@ IGL_INLINE void igl::opengl::ViewerData::set_face_based(bool newvalue)
   }
 }
 
+void igl::opengl::ViewerData::drawBox(Eigen::AlignedBox<double, 3> box, int color) {
+	point_size = 10;
+	line_width = 2;
+	Eigen::RowVector3d colorVec;
+	if (color == 1) {
+		colorVec = Eigen::RowVector3d(255, 0, 0);
+	}
+	else if (color == 2) {
+		colorVec = Eigen::RowVector3d(0, 0, 255);
+	}
+	else colorVec = Eigen::RowVector3d(0, 255, 0);
+	Eigen::RowVector3d BottomRightCeil = box.corner(box.BottomRightCeil);
+	Eigen::RowVector3d BottomRightFloor = box.corner(box.BottomRightFloor);
+	Eigen::RowVector3d BottomLeftCeil = box.corner(box.BottomLeftCeil);
+	Eigen::RowVector3d BottomLeftFloor = box.corner(box.BottomLeftFloor);
+	Eigen::RowVector3d TopRightCeil = box.corner(box.TopRightCeil);
+	Eigen::RowVector3d TopRightFloor = box.corner(box.TopRightFloor);
+	Eigen::RowVector3d TopLeftCeil = box.corner(box.TopLeftCeil);
+	Eigen::RowVector3d TopLeftFloor = box.corner(box.TopLeftFloor);
+	add_edges(BottomLeftCeil, BottomRightCeil, colorVec);
+	add_edges(BottomLeftCeil, BottomLeftFloor, colorVec);
+	add_edges(BottomRightCeil, BottomRightFloor, colorVec);
+	add_edges(BottomLeftFloor, BottomRightFloor, colorVec);
+	add_edges(TopLeftCeil, TopRightCeil, colorVec);
+	add_edges(TopRightCeil, TopRightFloor, colorVec);
+	add_edges(TopLeftCeil, TopLeftFloor, colorVec);
+	add_edges(TopLeftFloor, TopRightFloor, colorVec);
+	add_edges(TopLeftCeil, BottomLeftCeil, colorVec);
+	add_edges(TopRightFloor, BottomRightFloor, colorVec);
+	add_edges(TopRightCeil, BottomRightCeil, colorVec);
+	add_edges(TopLeftFloor, BottomLeftFloor, colorVec);
+}
+
+
 // Helpers that draws the most common meshes
 IGL_INLINE void igl::opengl::ViewerData::set_mesh(
     const Eigen::MatrixXd& _V, const Eigen::MatrixXi& _F)
@@ -363,7 +397,7 @@ IGL_INLINE void igl::opengl::ViewerData::clear_labels()
 }
 
 IGL_INLINE void igl::opengl::ViewerData::clear()
-{
+{/*
   V                       = Eigen::MatrixXd (0,3);
   F                       = Eigen::MatrixXi (0,3);
 
@@ -379,7 +413,7 @@ IGL_INLINE void igl::opengl::ViewerData::clear()
   V_normals               = Eigen::MatrixXd (0,3);
 
   V_uv                    = Eigen::MatrixXd (0,2);
-  F_uv                    = Eigen::MatrixXi (0,3);
+  F_uv                    = Eigen::MatrixXi (0,3);*/
 
   lines                   = Eigen::MatrixXd (0,9);
   points                  = Eigen::MatrixXd (0,6);

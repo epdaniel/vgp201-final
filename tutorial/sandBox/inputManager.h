@@ -23,10 +23,14 @@ static void glfw_mouse_press(GLFWwindow* window, int button, int action, int mod
 	  if(!found)
 	  {
 		  std::cout << "not found " << std::endl;
-		  scn->selected_data_index = savedIndx;
+		  scn->selected_data_index = -1;
 	  }
-	  else
+	  else {
 		  std::cout << "found " << i - 1 << std::endl;
+		  scn->selected_ball = i - 1;
+		  if(scn->selected_ball >= scn->snake_size)
+			scn->toggleIK();
+	  }
 	  rndr->UpdatePosition(x2, y2);
 	 
   }
@@ -55,7 +59,10 @@ static void glfw_mouse_press(GLFWwindow* window, int button, int action, int mod
 static void glfw_mouse_scroll(GLFWwindow* window, double x, double y)
 {
 	Renderer* rndr = (Renderer*)glfwGetWindowUserPointer(window);
-	rndr->GetScene()->data().MyScale(Eigen::Vector3f(1 + y * 0.01,1 + y * 0.01,1+y*0.01));
+	if (rndr->GetScene()->selected_data_index == -1) 
+		rndr->GetScene()->MyScale(Eigen::Vector3f(1 + y * 0.01, 1 + y * 0.01, 1 + y * 0.01));
+	else
+		rndr->GetScene()->data().MyScale(Eigen::Vector3f(1 + y * 0.01,1 + y * 0.01,1+y*0.01));
 
 }
 
@@ -143,6 +150,9 @@ static void glfw_key_callback(GLFWwindow* window, int key, int scancode, int act
 			break;
 		case ':':
 			scn->data().show_faceid = !scn->data().show_faceid;
+			break;
+		case ' ':
+			scn->toggleIK();
 			break;
 		default: break;//do nothing
 		}

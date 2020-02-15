@@ -42,12 +42,13 @@
 #include <igl/unproject.h>
 #include <igl/serialize.h>
 
+#include <vector>
 // Internal global variables used for glfw event handling
 //static igl::opengl::glfw::Viewer * __viewer;
 static double highdpi = 1;
 static double scroll_x = 0;
 static double scroll_y = 0;
-
+using namespace std;
 
 namespace igl
 {
@@ -117,6 +118,128 @@ namespace glfw
 
   IGL_INLINE Viewer::~Viewer()
   {
+  }
+
+  bool  Viewer::load_configuration()
+  {
+	  ifstream myReadFile;
+	  int ballindex = 0;
+	  int i = 0;
+	  myReadFile.open("configuration.txt");
+	  string path;
+	  if (myReadFile.is_open()) {
+		  while (!myReadFile.eof()) {
+			  getline(myReadFile, path);
+			  cout << "Loading: " << path;
+			  cout << "\n";
+			  if (load_mesh_from_file(path) && path.find("cylinder") != std::string::npos) {
+				snake_size++;
+			  }
+			  else if (path.find("sphere") != std::string::npos) {
+				  balls[ballindex] = i;
+			  }
+			  i++;
+		  }
+	  }
+	  else {
+		  cout << "Error loading configuartion file\n";
+		  return false;
+	  }
+	  cout << "Done loading\n";
+	  myReadFile.close();
+	  return true;
+  }
+
+  void Viewer::toggleIK() {
+	  if (IKon == true) {
+		  fixAxis();
+	  }
+	  IKon = !IKon;
+  }
+
+  void Viewer::animateIK() {
+	  int head_index = snake_size - 1;
+	  Eigen::Vector4f root4 = data_list[0].MakeTrans() * Eigen::Vector4f(0, -0.8, 0, 1);
+	  Eigen::Vector3f root = Eigen::Vector3f(root4[0], root4[1], root4[2]);
+
+	  Eigen::Vector4f ball4 = data_list[selected_ball].MakeTrans() * Eigen::Vector4f(0, 0, 0, 1);
+	  Eigen::Vector3f ball = Eigen::Vector3f(ball4[0], ball4[1], ball4[2]);
+
+	  double dist = (root - ball).norm();
+
+	  if (dist > 1.6 * snake_size) { //1.6 is one cylinder size
+		  cout << "cannot reach" << endl;
+		  IKon = false;
+		  return;
+	  }
+	  Eigen::Vector4f E4;
+	  Eigen::Vector3f E;
+	  for (int i = head_index; i >= 0; i--) {
+		  E4 = ParentsTrans(head_index) * data_list[head_index].MakeTrans() *  Eigen::Vector4f(0, 0.8, 0, 1);
+		  E = Eigen::Vector3f(E4[0], E4[1], E4[2]);
+		  dist = (E - ball).norm();
+
+		  Eigen::Vector4f R4 = ParentsTrans(i) * data_list[i].MakeTrans() * Eigen::Vector4f(0, -0.8, 0, 1);
+		  Eigen::Vector3f R = Eigen::Vector3f(R4[0], R4[1], R4[2]);
+		  
+		  Eigen::Vector3f RE = E - R;
+		  Eigen::Vector3f RD = ball - R;
+		  
+		  float dot = RD.normalized().dot(RE.normalized());
+		  float alphaRad = acosf(dot); //alpha in radians
+		  if (dot >= 1.0)
+			  alphaRad = 0;
+		  if (dist > 0.5)
+			alphaRad = snake_speed; 
+		  else if (dist > 0.15)
+			  alphaRad = alphaRad / 20;
+
+		  Eigen::Vector3f cros = RE.cross(RD);
+		  cros.normalize();
+		  cros = ParentsInverseRot(i) * cros;
+		  data_list[i].MyRotate(cros, alphaRad, false);
+		  // ----- Debug Prints ----
+		  //float alpha =  alphaRad / M_PI * 180.0; //alpha in degrees
+		  //cout << "R: " << endl << R << endl << "E: " << endl << E << endl;
+		  //cout << "RE: " << endl << RE << endl << "RD: " << endl << RD << endl;
+		  //cout << "alpha: " << alphaRad << endl;
+		  //cout << "dot: " << dot << endl;
+	  }
+	  E4 = ParentsTrans(head_index) * data_list[head_index].MakeTrans() *  Eigen::Vector4f(0, 0.8, 0, 1);
+	  E = Eigen::Vector3f(E4[0], E4[1], E4[2]);
+	  dist = (E - ball).norm();
+  }
+
+  void Viewer::fixAxis() {
+	  float firstY = 0;
+	  for (int i = 0; i < snake_size; i++) {
+		  Eigen::Matrix3f RU = data_list[i].Tout.rotation().matrix();
+		  if (RU(1, 1) < 1.0) {
+			  if (RU(1, 1) > -1.0) {
+				  float y = atan2f(RU(1, 0), -RU(1, 2));
+				  data_list[i].MyRotate(Eigen::Vector3f(0, 1, 0), -y, false);
+				  if (i != snake_size - 1) {
+					  data_list[i + 1].MyRotate(Eigen::Vector3f(0, 1, 0), y, true);
+				  }
+			  }
+		  }
+	  }
+  }
+
+  Eigen::Matrix4f Viewer::ParentsTrans(int index) {
+	  if (index == 0 || index >= snake_size)
+		  return Eigen::Transform<float, 3, Eigen::Affine>::Identity().matrix();
+	  return ParentsTrans(index - 1) * data_list[index - 1].MakeTrans();
+  }
+
+  Eigen::Matrix3f Viewer::ParentsInverseRot(int index) {
+	  Eigen::Matrix3f rot = data(index).Tout.rotation().matrix().inverse();
+	  if (index >= snake_size)
+		  return rot;
+	  for(int i = index - 1; i >= 0; i--) {
+		  rot = rot * data(i).Tout.rotation().matrix().inverse();
+	  }
+	  return rot;
   }
 
   IGL_INLINE bool Viewer::load_mesh_from_file(
@@ -299,9 +422,8 @@ namespace glfw
       index = selected_data_index;
     else
       index = mesh_index(mesh_id);
-
     assert((index >= 0 && index < data_list.size()) &&
-      "selected_data_index or mesh_id should be in bounds");
+      "selected_data_index or mesh_id should be in bounds: ");
     return data_list[index];
   }
 
