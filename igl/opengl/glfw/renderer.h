@@ -104,11 +104,11 @@ public:
 	bool checkCollisionRec(igl::AABB<Eigen::MatrixXd, 3> *node1, igl::AABB<Eigen::MatrixXd, 3> *node2, Eigen::Matrix3d &A, Eigen::Matrix3d &B, Eigen::Matrix3d &C, int i1, int i2);
 	bool checkCollisionHelper(Eigen::AlignedBox<double, 3> &box1, Eigen::AlignedBox<double, 3> &box2, Eigen::Matrix3d &A, Eigen::Matrix3d &B, Eigen::Matrix3d &C, int i1, int i2);
 
+	size_t selected_core_index;
+	std::vector<igl::opengl::ViewerCore> core_list;
 private:
 	// Stores all the viewing options
-	std::vector<igl::opengl::ViewerCore> core_list;
 	igl::opengl::glfw::Viewer* scn;
-	size_t selected_core_index;
 	int next_core_id;
 	float highdpi;
 	double xold, yold, xrel, yrel;

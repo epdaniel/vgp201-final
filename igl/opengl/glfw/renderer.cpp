@@ -68,6 +68,13 @@ IGL_INLINE void Renderer::draw( GLFWwindow* window)
 		{
 			if (mesh.is_visible & core.id)
 			{
+				if (core.id == 2) {
+					Eigen::Matrix4f headTransMat = scn->MakeTrans() * scn->ParentsTrans(scn->snake_size - 1) * scn->data(scn->snake_size - 1).MakeTrans();
+					core.camera_translation = (headTransMat * Eigen::Vector4f(0, 0.8, 0.8, -1)).block(0, 0, 3, 1);
+					core.camera_eye = (headTransMat.block(0, 0, 3, 3) * Eigen::Vector3f(0, -1, 0)).block(0, 0, 3, 1);
+					core.camera_up = (headTransMat.block(0, 0, 3, 3) * Eigen::Vector3f(0, 0, -1)).block(0, 0, 3, 1);
+				}
+
 				Matrix4f parents = Matrix4f().Identity();	
 				parents = scn->ParentsTrans(mesh.id);
 				Matrix4f temp = scn->MakeTrans() * parents;
@@ -301,7 +308,7 @@ void Renderer::checkCollision() {
 
 	if (checkCollisionRec(node1, node2, *A, *B, *C, head_index, ball_index)) {
 		//cout << "Collision detected! " << endl;
-		//scn->toggleIK();
+		//cout << "Scored! | Score: " << ++scn->score << endl;
 		scn->IKon = false;
 		scn->fixAxis();
 	}
